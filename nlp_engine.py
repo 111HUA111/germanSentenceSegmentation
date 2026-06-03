@@ -3,86 +3,104 @@ import spacy
 
 class GermanNLPEngine:
     def __init__(self, model_name="de_core_news_sm"):
-        """
-        初始化 NLP 引擎，加载 spaCy 模型并设置初始黑名单
-        """
         try:
-            # 禁用不需要的管道组件（如命名实体识别 NER）以极大提升运行速度并降低内存占用
             self.nlp = spacy.load(model_name, disable=["ner", "lemmatizer", "textcat"])
         except OSError:
             raise OSError(f"未找到 spaCy 模型 '{model_name}'。请先在终端运行: python -m spacy download {model_name}")
         
-        # 内置的常见德语缩写黑名单
+        # 1. 缩写黑名单（防句号被切）
         self.blacklist = [
             "z.B.", "bzw.", "Dr.", "Prof.", "ca.", "usw.", 
             "d.h.", "vgl.", "u.a.", "inkl.", "ggf.", "z.T."
         ]
-        # 用于替换句号的绝对安全的掩码
-        self.mask_token = "<MASK_DOT>"
+        
+        # 2. 强制绑定的短语黑名单（防空格被切断）
+        self.protected_phrases = [
+            "Poly Rattan Rahmen",
+            "Poly Rattan",
+            # 你可以在这里继续添加你们行业里常被卖家写错、容易被切断的专有名词
+        ]
+        
+        self.mask_dot = "XXXDOTXXX"       
+        self.mask_space = "XXXSPACEXXX"  # 新增：用于保护短语内空格的掩码
         self.ignore_case = False
 
     def update_blacklist(self, custom_words, ignore_case=False):
-        """
-        更新/追加自定义黑名单
-        """
+        """更新自定义黑名单（这里简化逻辑，直接全加进缩写库，你可以在 UI 独立分开）"""
         self.ignore_case = ignore_case
         if not custom_words:
             return
-            
-        # 合并系统词库与用户词库，去重
         combined = list(set(self.blacklist + custom_words))
-        # 【关键防呆设计】：按字符串长度降序排序。
-        # 确保 "GmbH & Co." 优先于 "Co." 被匹配，防止短词破坏长词结构
         self.blacklist = sorted(combined, key=len, reverse=True)
 
     def _mask_text(self, text):
-        """
-        第一阶段（戴面具）：保护黑名单词汇中的句号
-        """
         masked_text = text
         flags = re.IGNORECASE if self.ignore_case else 0
 
+        # --- 阶段 A：保护强制绑定的短语（用掩码替换它们内部的空格） ---
+        for phrase in sorted(self.protected_phrases, key=len, reverse=True):
+            if " " not in phrase:
+                continue
+                
+            # 匹配整个词组
+            pattern = r'\b' + re.escape(phrase) + r'\b'
+            
+            # 将匹配到的词组内的空格，替换为 mask_space
+            def space_repl(match):
+                return match.group(0).replace(" ", self.mask_space)
+
+            masked_text = re.sub(pattern, space_repl, masked_text, flags=flags)
+
+        # --- 阶段 B：保护黑名单词汇中的句号 ---
         for word in self.blacklist:
             if "." not in word:
-                continue # 没有句号的缩写不会引起断句误判，直接跳过
+                continue 
             
-            # 【词边界防御设计】：左侧不能是德文字母，防止类似于 "in." 匹配到 "Termin." 的结尾
             pattern = r'(?<![a-zA-ZäöüßÄÖÜ])' + re.escape(word)
-            
-            # 替换函数：动态把匹配到的原词中的 "." 替换为掩码
-            # 这样做的好处是，在 ignore_case=True 时，依然保留原文的大小写格式
-            def repl(match):
-                return match.group(0).replace(".", self.mask_token)
+            def dot_repl(match):
+                return match.group(0).replace(".", self.mask_dot)
 
-            masked_text = re.sub(pattern, repl, masked_text, flags=flags)
+            masked_text = re.sub(pattern, dot_repl, masked_text, flags=flags)
             
         return masked_text
 
     def _unmask_text(self, text):
-        """
-        第三阶段（卸面具）：将掩码还原为真实的句号
-        """
-        return text.replace(self.mask_token, ".")
+        """还原句号和空格"""
+        text = text.replace(self.mask_dot, ".")
+        text = text.replace(self.mask_space, " ")
+        return text
 
     def split_sentences(self, text):
-        """
-        主入口：执行完整的德语分句流程
-        """
         if not text or not str(text).strip():
             return []
 
-        # 1. 预处理：给黑名单词汇戴上面具
+        # 1. 预处理掩码
         masked_text = self._mask_text(str(text))
-
-        # 2. 核心切分：交给 spaCy 引擎处理
-        # 此时 spaCy 看不到黑名单里的句号，绝对不会误切
+        
+        # 2. AI 切分
         doc = self.nlp(masked_text)
         
-        sentences = []
+        raw_sents = []
         for sent in doc.sents:
-            # 3. 后处理：逐句还原真实句号，并清理两端多余的空格或换行
             clean_sent = self._unmask_text(sent.text).strip()
             if clean_sent:
-                sentences.append(clean_sent)
+                raw_sents.append(clean_sent)
 
-        return sentences
+        # 3. 冒号强力胶后处理
+        merged_sentences = []
+        buffer = ""
+        
+        for s in raw_sents:
+            if buffer:
+                buffer += " " + s
+            else:
+                buffer = s
+                
+            if not buffer.endswith(":"):
+                merged_sentences.append(buffer)
+                buffer = ""
+                
+        if buffer:
+            merged_sentences.append(buffer)
+
+        return merged_sentences
