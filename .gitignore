@@ -1,1 +1,16 @@
+# 编辑器配置
 .vscode/
+
+# Python 缓存
+__pycache__/
+
+# 软件运行产生的本地配置与数据
+custom_blacklist.json
+*.csv
+*.xlsx
+*.xls
+
+# PyInstaller 打包产物
+build/
+dist/
+*.spec
