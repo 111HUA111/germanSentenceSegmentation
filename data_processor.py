@@ -10,11 +10,12 @@ class ExcelDataProcessor:
 
     def process_file(self, input_path, target_col_name, output_path=None, progress_callback=None):
         """
-        核心处理流：读取 Excel、分句、导出新 Excel
+        核心处理流：读取 Excel、分句、按【列】平铺导出新 Excel
         """
         if not output_path:
             base, ext = os.path.splitext(input_path)
-            output_path = f"{base}_split.xlsx"
+            # 文件名加个 _columns 区分一下
+            output_path = f"{base}_columns.xlsx"
 
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"找不到文件: {input_path}")
@@ -37,7 +38,6 @@ class ExcelDataProcessor:
 
         # 2. 逐行处理数据
         for idx, row in df.iterrows():
-            # 提取目标列文本，处理空值 (NaN)
             original_text = row[target_col_name]
             if pd.isna(original_text):
                 original_text = ""
@@ -53,24 +53,30 @@ class ExcelDataProcessor:
             if not sentences:
                 sentences = [original_text]
 
-            # 3. 构造空白折叠长表格式
+            # --- 💡 核心逻辑更改：构建动态列字典 ---
+            # 先把原始文本放进字典
+            row_dict = {"原始文本": original_text}
+            
+            # 动态生成 "分句_1", "分句_2" 等列名，并赋值
             for s_idx, sentence in enumerate(sentences, 1):
-                if s_idx == 1:
-                    output_data.append([original_text, s_idx, sentence])
-                else:
-                    output_data.append(["", s_idx, sentence])
+                row_dict[f"分句_{s_idx}"] = sentence
+
+            # 将这行字典存入总列表
+            output_data.append(row_dict)
 
             processed_rows += 1
-            
-            # 触发进度条更新
             if progress_callback:
                 progress_callback(processed_rows, total_rows)
 
-        # 4. 将处理后的数据转为 DataFrame 并导出为新的 Excel
-        out_df = pd.DataFrame(output_data, columns=["原始文本", "句子序号", "分句结果"])
+        # 3. 生成动态宽表 DataFrame
+        # pandas 会自动扫描所有字典，把最多的分句数作为总列数，没有分句的地方会填入 NaN
+        out_df = pd.DataFrame(output_data)
         
+        # 将难看的 NaN (空值) 替换为空白字符串，保证 Excel 干净整洁
+        out_df.fillna("", inplace=True)
+        
+        # 4. 导出为新的 Excel
         try:
-            # 强制禁用索引导出，确保排版干净
             out_df.to_excel(output_path, index=False)
         except PermissionError:
             raise PermissionError("导出失败！请检查是否在其他程序中打开了同名的输出文件。")
