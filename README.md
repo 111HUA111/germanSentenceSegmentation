@@ -36,6 +36,6 @@
 
 **1. 克隆项目 & 安装依赖库：**
 ```bash
-git clone https://your-repo/GermanSplitter.git
+git clone https://github.com/111HUA111/germanSentenceSegmentation.git
 cd GermanSplitter
 pip install -r requirements.txt
