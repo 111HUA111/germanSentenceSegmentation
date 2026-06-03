@@ -1,11 +1,11 @@
-# 🔪 GermanSplitter - 德语精准分句工具 (企业级)
+# GermanSplitter - 德语分句工具
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-green.svg)
 ![spaCy](https://img.shields.io/badge/spaCy-NLP-orange.svg)
 ![Pandas](https://img.shields.io/badge/Pandas-Data-yellow.svg)
 
-## 📖 项目简介 (Introduction)
+## 项目简介 (Introduction)
 
 **GermanSplitter** 是一款轻量级桌面端软件。
 
@@ -15,7 +15,7 @@
 
 ---
 
-## ✨ 核心特性 (Key Features)
+##  核心特性 (Key Features)
 
 *  **AI 句法级驱动**：底层采用 `de_core_news_sm` 深度学习模型，不依赖单纯的标点符号，即使原文本没有句号和回车（“字符墙”），也能剥离小标题与正文。
 *  **动态缩写保护（白名单持久化）**：自带悬浮配置面板，支持业务人员自定义行业缩写库（如`GmbH & Co. KG`, `bzw.`）。配置自动持久化为本地 `JSON`，下次启动自动读取，防止句号误切。
@@ -24,7 +24,7 @@
 
 ---
 
-## 🚀 快速上手 (Quick Start)
+##  快速上手 (Quick Start)
 
 ### 方案一：免安装开箱即用（推荐业务人员使用）
 1. 下载最新版本的打包文件 `GermanSplitter_v1.0.zip`。
