@@ -8,13 +8,13 @@ class GermanNLPEngine:
         except OSError:
             raise OSError(f"未找到 spaCy 模型 '{model_name}'。请先在终端运行: python -m spacy download {model_name}")
         
-        # 1. 缩写黑名单（防句号被切）
+        # 1. 缩写白名单（防句号被切）
         self.blacklist = [
             "z.B.", "bzw.", "Dr.", "Prof.", "ca.", "usw.", 
             "d.h.", "vgl.", "u.a.", "inkl.", "ggf.", "z.T."
         ]
         
-        # 2. 强制绑定的短语黑名单（防空格被切断）
+        # 2. 强制绑定的短语白名单（防空格被切断）
         self.protected_phrases = [
             "Poly Rattan Rahmen",
             "Poly Rattan",
@@ -26,7 +26,7 @@ class GermanNLPEngine:
         self.ignore_case = False
 
     def update_blacklist(self, custom_words, ignore_case=False):
-        """更新自定义黑名单（这里简化逻辑，直接全加进缩写库，你可以在 UI 独立分开）"""
+        """更新自定义白名单（这里简化逻辑，直接全加进缩写库，你可以在 UI 独立分开）"""
         self.ignore_case = ignore_case
         if not custom_words:
             return
@@ -51,7 +51,7 @@ class GermanNLPEngine:
 
             masked_text = re.sub(pattern, space_repl, masked_text, flags=flags)
 
-        # --- 阶段 B：保护黑名单词汇中的句号 ---
+        # --- 阶段 B：保护白名单词汇中的句号 ---
         for word in self.blacklist:
             if "." not in word:
                 continue 

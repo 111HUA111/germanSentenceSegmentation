@@ -2,13 +2,13 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 import os
-import csv
+import pandas as pd
 import json
 import ctypes
 
 # 导入核心逻辑
 from nlp_engine import GermanNLPEngine
-from data_processor import CSVDataProcessor
+from data_processor import ExcelDataProcessor  # 类名变了！
 
 #开启 Windows 高 DPI 感知，彻底解决字体模糊
 # ==========================================
@@ -53,8 +53,8 @@ class GermanSplitterApp:
         # 核心逻辑变量（保持完全一致）
         self.engine = None
         self.processor = None
-        self.csv_filepath = ""
-        self.csv_headers = []
+        self.excel_filepath = ""
+        self.excel_headers = []
         self.config_file = "custom_blacklist.json"
         self.custom_blacklist = self.load_blacklist()
 
@@ -152,44 +152,44 @@ class GermanSplitterApp:
         tk.Label(self.tab_text, text="分句结果展示：", font=FONT_TITLE, fg=COLOR_TEXT_MAIN, bg=COLOR_CARD).pack(anchor=tk.W, padx=15, pady=(5, 0))
         self.text_output = tk.Text(self.tab_text, height=7, font=FONT_MAIN, fg=COLOR_TEXT_MAIN,
                                    bg="#F3F4F6", relief="solid", bd=1, highlightthickness=0, wrap=tk.WORD)
-        self.text_output.pack(fill=tk.X, padx=15, pady=5)
+        self.text_output.pack(fill=tk.BOTH, expand=True, padx=15, pady=(5, 15))
 
         # ====================================================
-        # --- Tab 2: CSV 批量处理 ---
+        # --- Tab 2: Excel 批量处理 ---
         # ====================================================
-        self.tab_csv = tk.Frame(self.notebook, bg=COLOR_CARD)
-        self.notebook.add(self.tab_csv, text="  📊 CSV 批量处理  ")
+        self.tab_excel = tk.Frame(self.notebook, bg=COLOR_CARD)
+        self.notebook.add(self.tab_excel, text="  📊 Excel 批量处理  ")
         
         # 步骤 1：文件上传区卡片化布局
-        tk.Label(self.tab_csv, text="第一步：上传需要切分的 CSV 文件", font=FONT_TITLE, fg=COLOR_TEXT_MAIN, bg=COLOR_CARD).pack(anchor=tk.W, padx=20, pady=(20, 5))
-        frame_file = tk.Frame(self.tab_csv, bg=COLOR_CARD)
+        tk.Label(self.tab_excel, text="第一步：上传需要切分的 Excel 文件", font=FONT_TITLE, fg=COLOR_TEXT_MAIN, bg=COLOR_CARD).pack(anchor=tk.W, padx=20, pady=(20, 5))
+        frame_file = tk.Frame(self.tab_excel, bg=COLOR_CARD)
         frame_file.pack(fill=tk.X, padx=20, pady=5)
         
-        self.lbl_filename = tk.Label(frame_file, text="请选择或拖入一个有效的 CSV 文件路径...", fg=COLOR_TEXT_MUTED, 
+        self.lbl_filename = tk.Label(frame_file, text="请选择或拖入一个有效的 Excel 文件路径...", fg=COLOR_TEXT_MUTED, 
                                      bg="#F9FAFB", anchor="w", relief="solid", bd=1, font=FONT_MAIN, padx=10, pady=5)
         self.lbl_filename.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         
-        btn_browse = tk.Button(frame_file, text="浏览文件", command=self.select_csv, font=FONT_MAIN,
+        btn_browse = tk.Button(frame_file, text="浏览文件", command=self.select_file, font=FONT_MAIN,
                                bg="#E5E7EB", fg=COLOR_TEXT_MAIN, activebackground="#D1D5DB",
                                relief="flat", bd=0, cursor="hand2", padx=15)
         btn_browse.pack(side=tk.RIGHT, fill=tk.Y)
 
         # 步骤 2：下拉列表选择
-        tk.Label(self.tab_csv, text="第二步：指定【德语语料】所在的列名", font=FONT_TITLE, fg=COLOR_TEXT_MAIN, bg=COLOR_CARD).pack(anchor=tk.W, padx=20, pady=(15, 5))
+        tk.Label(self.tab_excel, text="第二步：指定【德语语料】所在的列名", font=FONT_TITLE, fg=COLOR_TEXT_MAIN, bg=COLOR_CARD).pack(anchor=tk.W, padx=20, pady=(15, 5))
         
         # 覆写 Combobox 样式使其符合扁平化视觉
-        self.combo_columns = ttk.Combobox(self.tab_csv, state="disabled", font=FONT_MAIN)
+        self.combo_columns = ttk.Combobox(self.tab_excel, state="disabled", font=FONT_MAIN)
         self.combo_columns.pack(fill=tk.X, padx=20, pady=5)
 
         # 底部动作与进度渲染区
-        frame_bottom = tk.Frame(self.tab_csv, bg=COLOR_CARD)
+        frame_bottom = tk.Frame(self.tab_excel, bg=COLOR_CARD)
         frame_bottom.pack(fill=tk.BOTH, expand=True, padx=20, pady=(25, 15))
         
-        self.btn_run_csv = tk.Button(frame_bottom, text="▶ 开始流式处理并导出长表", command=self.start_csv_processing, 
+        self.btn_run_excel = tk.Button(frame_bottom, text="▶ 开始流式处理并导出长表", command=self.start_excel_processing, 
                                      state="disabled", bg=COLOR_PRIMARY, fg="white", font=(FONT_FAMILY, 12, "bold"),
                                      activebackground=COLOR_PRIMARY_HOVER, activeforeground="white",
                                      relief="flat", bd=0, cursor="hand2", pady=8)
-        self.btn_run_csv.pack(fill=tk.X, pady=(0, 15))
+        self.btn_run_excel.pack(fill=tk.X, pady=(0, 15))
         
         # 进度指示器
         self.progress_bar = ttk.Progressbar(frame_bottom, orient="horizontal", mode="determinate")
@@ -203,7 +203,7 @@ class GermanSplitterApp:
             try:
                 self.engine = GermanNLPEngine()
                 self.engine.update_blacklist(self.custom_blacklist) 
-                self.processor = CSVDataProcessor(self.engine)
+                self.processor = ExcelDataProcessor(self.engine)
                 self.root.after(0, lambda: self.lbl_status.config(text="✅ SpaCy离线引擎已完全就绪", fg=COLOR_SUCCESS))
             except Exception as e:
                 self.root.after(0, lambda: messagebox.showerror("引擎加载失败", str(e)))
@@ -221,41 +221,46 @@ class GermanSplitterApp:
         for i, s in enumerate(sentences, 1):
             self.text_output.insert(tk.END, f"[{i}] {s}\n\n")
 
-    def select_csv(self):
-        filepath = filedialog.askopenfilename(filetypes=[("CSV 文件", "*.csv")])
+    def select_file(self):
+        # 1. 限制只能选择 xlsx 文件
+        filepath = filedialog.askopenfilename(filetypes=[("Excel 文件", "*.xlsx"), ("旧版 Excel", "*.xls")])
         if not filepath:
             return
-        self.csv_filepath = filepath
-        self.lbl_filename.config(text=os.path.basename(filepath), fg=COLOR_TEXT_MAIN)
+            
+        self.excel_filepath = filepath
+        self.lbl_filename.config(text=os.path.basename(filepath), fg="#1F2937")
+        
+        # 2. 尝试用 pandas 读取表头
         try:
-            with open(filepath, mode='r', encoding='utf-8-sig') as f:
-                reader = csv.reader(f)
-                self.csv_headers = next(reader)
-            self.combo_columns.config(values=self.csv_headers, state="readonly")
-            if self.csv_headers:
+            df = pd.read_excel(filepath, nrows=0) # 极速读取，只读表头
+            self.excel_headers = list(df.columns)
+            
+            self.combo_columns.config(values=self.excel_headers, state="readonly")
+            if self.excel_headers:
                 self.combo_columns.current(0)
-            self.btn_run_csv.config(state="normal")
-            self.lbl_progress_text.config(text="解析表头成功，请选择对应的目标列后开启任务。")
+                
+            self.btn_run_excel.config(state="normal")
+            self.lbl_progress_text.config(text="解析 Excel 表头成功，请选择对应的目标列后开启任务。")
         except Exception as e:
-            messagebox.showerror("读取失败", f"无法读取该 CSV，请确保其编码为 UTF-8。\n详细信息: {e}")
+            messagebox.showerror("读取失败", f"无法读取该 Excel。\n详细信息: {e}")
 
-    def start_csv_processing(self):
+    def start_excel_processing(self):
         target_col = self.combo_columns.get()
         if not target_col:
             return
-        self.btn_run_csv.config(state="disabled", text="⚡ 后台流式计算中...", bg="#9CA3AF")
+        self.btn_run_excel.config(state="disabled", text="⚡ 后台流式计算中...", bg="#9CA3AF")
         self.combo_columns.config(state="disabled")
         self.progress_bar["value"] = 0
-        threading.Thread(target=self._process_csv_thread, args=(target_col,), daemon=True).start()
+        threading.Thread(target=self._process_excel_thread, args=(target_col,), daemon=True).start()
 
-    def _process_csv_thread(self, target_col):
+    def _process_excel_thread(self, target_col):
         try:
             def update_progress(current, total):
                 pct = (current / total) * 100
                 self.root.after(0, self._set_progress_ui, pct, f"已流式写入: {current} / {total} 行 records...")
 
             output_file = self.processor.process_file(
-                input_path=self.csv_filepath,
+                input_path=self.excel_filepath,
                 target_col_name=target_col,
                 progress_callback=update_progress
             )
@@ -268,7 +273,7 @@ class GermanSplitterApp:
         self.lbl_progress_text.config(text=text, fg=COLOR_TEXT_MAIN)
 
     def _processing_done(self, success, message):
-        self.btn_run_csv.config(state="normal", text="▶ 开始流式处理并导出长表", bg=COLOR_PRIMARY)
+        self.btn_run_excel.config(state="normal", text="▶ 开始流式处理并导出长表", bg=COLOR_PRIMARY)
         self.combo_columns.config(state="readonly")
         if success:
             self.lbl_progress_text.config(text="🎉 任务圆满完成！目标大表已被完全重写。", fg=COLOR_SUCCESS)
@@ -287,7 +292,7 @@ class GermanSplitterApp:
 
         modal = tk.Toplevel(self.root)
         modal.title("自定义规则词库面板")
-        modal.geometry("380x420")
+        modal.geometry("500x420")
         modal.configure(bg=COLOR_CARD)
         # modal.resizable(False, False)
         self.root.minsize(600, 480)
