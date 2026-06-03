@@ -357,3 +357,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = GermanSplitterApp(root)
     root.mainloop()
+# pyinstaller --name "GermanSplitter" --noconsole --onedir --collect-all spacy --collect-all de_core_news_sm main_window.py
